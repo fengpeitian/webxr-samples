@@ -29,14 +29,18 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
   <link rel='icon' type='image/png' sizes='32x32' href='./favicon-32x32.png'>
   <link rel='icon' type='image/png' sizes='96x96' href='./favicon-96x96.png'>
   <link rel='stylesheet' href='./css/common.css'>
-
+  <style>  
+    .ar-button {  
+      margin-top: 10px; 
+    }  
+  </style> 
   <title>Immersive Session with hands</title>
 </head>
 
 <body>
   <header>
     <details open>
-      <summary>Immersive VR Session with hands</summary>
+      <summary>Immersive XR Session with hands</summary>
       <p>
         This sample demonstrates a simple VR session that shows the user's hands.
         If your device supports this feature, you will see your hands using a set
@@ -69,9 +73,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     const DEFAULT_PROFILES_PATH = 'https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles';
 
     // XR globals.
-    let xrButton = null;
+	let xrButton = null;
+	let vrButton = null;
+    let arButton = null;
     let xrRefSpace = null;
-    let isAR = false;
     let radii = new Float32Array(25);
     let positions = new Float32Array(16*25);
     
@@ -160,25 +165,38 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     function initXR() {
       // Adds a helper button to the page that indicates if any XRDevices are
       // available and let's the user pick between them if there's multiple.
-      xrButton = new WebXRButton({
-        onRequestSession: onRequestSession,
+      vrButton = new WebXRButton({
+		onRequestSession: function() {
+	        xrButton = vrButton
+	        return navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'] }).then(onSessionStarted);
+		},
         onEndSession: onEndSession
       });
-      document.querySelector('header').appendChild(xrButton.domElement);
-
+      arButton = new WebXRButton({
+  		onRequestSession: function() {
+  	        xrButton = arButton
+  	        return navigator.xr.requestSession('immersive-ar', { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'] }).then(onSessionStarted);
+  		},
+        onEndSession: onEndSession
+      });
+	  arButton.domElement.classList.add('ar-button');
+      document.querySelector('header').appendChild(vrButton.domElement);
+	  document.querySelector('header').appendChild(arButton.domElement);
+	  
       // Is WebXR available on this UA?
       if (navigator.xr) {
         // If the device allows creation of exclusive sessions set it as the
         // target of the 'Enter XR' button.
         navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
-          if (supported)
-            xrButton.enabled = supported;
-          else
-            navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-              isAR = true;
-              xrButton.enabled = supported;
-            });
+          if (supported) {
+          	vrButton.enabled = supported;
+          }
         });
+      	navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+          if (supported) {
+          	arButton.enabled = supported;
+          }
+      	});
       }
     }
 
