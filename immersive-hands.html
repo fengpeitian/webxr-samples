@@ -30,8 +30,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
   <link rel='icon' type='image/png' sizes='96x96' href='./favicon-96x96.png'>
   <link rel='stylesheet' href='./css/common.css'>
   <style>  
-    .ar-button {  
-      margin-top: 10px; 
+    button {  
+      margin-left: 10px; 
     }  
   </style> 
   <title>Immersive Session with hands</title>
@@ -73,9 +73,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     const DEFAULT_PROFILES_PATH = 'https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles';
 
     // XR globals.
-	let xrButton = null;
-	let vrButton = null;
-    let arButton = null;
+	let xrSession = null;
     let xrRefSpace = null;
     let radii = new Float32Array(25);
     let positions = new Float32Array(16*25);
@@ -100,7 +98,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     let gl = null;
     let renderer = null;
     let scene = new Scene();
-    scene.addNode(new Gltf2Node({ url: './media/gltf/space/space.gltf' }));
+    //scene.addNode(new Gltf2Node({ url: './media/gltf/space/space.gltf' }));
 	let skybox = new SkyboxNode({ url: './media/textures/milky-way-4k.png' })
 	
     function createBoxPrimitive(r, g, b) {	
@@ -159,61 +157,63 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
       indexFingerBoxes.tracked_left = addBox(0, 0, 0, leftBoxColor.r, leftBoxColor.g, leftBoxColor.b);
       indexFingerBoxes.tracked_right = addBox(0, 0, 0, rightBoxColor.r, rightBoxColor.g, rightBoxColor.b);
     }
-
-    // Checks to see if WebXR is available and, if so, queries a list of
-    // XRDevices that are connected to the system.
-    function initXR() {
-      // Adds a helper button to the page that indicates if any XRDevices are
-      // available and let's the user pick between them if there's multiple.
-      vrButton = new WebXRButton({
-		onRequestSession: function() {
-	        xrButton = vrButton
-			scene.addNode(skybox);
-	        return navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'] }).then(onSessionStarted);
-		},
-        onEndSession: onEndSession
-      });
-      arButton = new WebXRButton({
-  		onRequestSession: function() {
-  	        xrButton = arButton
-			scene.removeNode(skybox);
-  	        return navigator.xr.requestSession('immersive-ar', { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'] }).then(onSessionStarted);
-  		},
-        onEndSession: onEndSession
-      });
-	  arButton.domElement.classList.add('ar-button');
-      document.querySelector('header').appendChild(vrButton.domElement);
-	  document.querySelector('header').appendChild(arButton.domElement);
-	  
-      // Is WebXR available on this UA?
-      if (navigator.xr) {
-        // If the device allows creation of exclusive sessions set it as the
-        // target of the 'Enter XR' button.
-        navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
-          if (supported) {
-          	vrButton.enabled = supported;
-          }
-        });
-      	navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-          if (supported) {
-          	arButton.enabled = supported;
-          }
-      	});
-      }
-    }
-
-    // Called when the user selects a device to present to. In response we
-    // will request an exclusive session from that device.
-    function onRequestSession() {
-      return navigator.xr.requestSession(isAR?'immersive-ar':'immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'] }).then(onSessionStarted);
-    }
+	
+	function initXR() {  
+	    const vrButton = document.createElement('button');  
+	    vrButton.textContent = 'VR NOT FOUND';  
+	    vrButton.disabled = true;  
+	    vrButton.addEventListener('click', () => {  
+			if (!xrSession) { 
+				scene.addNode(skybox);
+			
+				navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'] }).then(onSessionStarted);
+			} else {
+				xrSession.end();
+			}
+	    });  
+	    document.querySelector('header').appendChild(vrButton);  
+  
+	    const arButton = document.createElement('button');  
+	    arButton.textContent = 'AR NOT FOUND';  
+	    arButton.disabled = true;  
+	    arButton.addEventListener('click', () => { 
+			if (!xrSession) { 
+				scene.removeNode(skybox);
+			
+				navigator.xr.requestSession('immersive-ar', { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'] }).then(onSessionStarted);
+			} else {
+				xrSession.end();
+			}
+	    });  
+	    document.querySelector('header').appendChild(arButton);  
+  
+	    if (navigator.xr) {  
+	        navigator.xr.isSessionSupported('immersive-vr').then((supported) => {  
+	            if (supported) {  
+	                vrButton.textContent = 'ENTER VR';  
+	                vrButton.disabled = false;  
+	            }  
+	        }).catch((error) => {  
+	            console.error('Error checking VR support:', error);  
+	        });  
+  
+	        navigator.xr.isSessionSupported('immersive-ar').then((supported) => {  
+	            if (supported) {  
+	                arButton.textContent = 'ENTER AR';  
+	                arButton.disabled = false;  
+	            }  
+	        }).catch((error) => {  
+	            console.error('Error checking AR support:', error);  
+	        });  
+	    }  
+	}
 
     // Called when we've successfully acquired a XRSession. In response we
     // will set up the necessary session state and kick off the frame loop.
     function onSessionStarted(session) {
       // This informs the 'Enter XR' button that the session has started and
       // that it should display 'Exit XR' instead.
-      xrButton.setSession(session);
+	  xrSession = session;
 
       // Listen for the sessions 'end' event so we can respond if the user
       // or UA ends the session for any reason.
@@ -282,7 +282,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     // At this point the session object is no longer usable and should be
     // discarded.
     function onSessionEnded(event) {
-      xrButton.setSession(null);
+      xrSession = null;
 
       // In this simple case discard the WebGL context too, since we're not
       // rendering anything else to the screen with it.
